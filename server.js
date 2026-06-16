@@ -16,14 +16,27 @@ const app = express();
 const server = http.createServer(app);
 
 // Socket.io
-const allowedOrigins = [
-  process.env.FRONTEND_URL || 'http://localhost:3000',
+const rawOrigins = [
+  process.env.FRONTEND_URL,
   process.env.FRONTEND_URL_2,
+  'http://localhost:3000',
 ].filter(Boolean);
+
+// Origin kontrolü - vercel.app ve railway.app'e izin ver
+const isAllowedOrigin = (origin) => {
+  if (!origin) return true;
+  if (rawOrigins.includes(origin)) return true;
+  if (origin.endsWith('.vercel.app')) return true;
+  if (origin.endsWith('.railway.app')) return true;
+  return false;
+};
 
 const io = new Server(server, {
   cors: {
-    origin: allowedOrigins,
+    origin: (origin, callback) => {
+      if (isAllowedOrigin(origin)) callback(null, true);
+      else callback(new Error('CORS engellendi: ' + origin));
+    },
     methods: ['GET', 'POST'],
     credentials: true,
   },
@@ -33,11 +46,8 @@ const io = new Server(server, {
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('CORS engellendi: ' + origin));
-    }
+    if (isAllowedOrigin(origin)) callback(null, true);
+    else callback(new Error('CORS engellendi: ' + origin));
   },
   credentials: true,
 }));
